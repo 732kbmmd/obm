@@ -1,4 +1,4 @@
-// lib/viewmodels/app_viewmodel.dart (수정 완료)
+// lib/viewmodels/app_viewmodel.dart (최종 수정)
 
 import 'package:flutter/material.dart';
 import 'package:obm/data/models/assembly_item.dart';
@@ -17,16 +17,12 @@ class AppViewModel with ChangeNotifier {
 
   bool _isEditing = false;
   bool get isEditing => _isEditing;
-
   EditingTarget _editingTarget = EditingTarget.none;
   EditingTarget get editingTarget => _editingTarget;
-
   List<AssemblyItem> _overviewItems = [];
   List<AssemblyItem> get overviewItems => _overviewItems;
-
   Size _artboardSize = const Size(1280, 720);
   Size get artboardSize => _artboardSize;
-
   int? _selectedItemIndex;
   int? get selectedItemIndex => _selectedItemIndex;
 
@@ -42,8 +38,6 @@ class AppViewModel with ChangeNotifier {
   void createNewTemplate(TemplateType type) {
     _overviewItems = [];
     _artboardSize = const Size(1280, 720);
-    print('$type 템플릿 생성 (1280x720)');
-
     _overviewItems.add(
       AssemblyItem(
         type: AssemblyItemType.background,
@@ -58,7 +52,6 @@ class AppViewModel with ChangeNotifier {
         size: const Size(600, 100),
       ),
     );
-
     for (int i = 0; i < 7; i++) {
       _overviewItems.add(
         AssemblyItem(
@@ -96,22 +89,20 @@ class AppViewModel with ChangeNotifier {
     notifyListeners();
   }
 
-  /// 아이템의 위치를 업데이트하는 메소드
+  /// [핵심] 아이템의 위치를 업데이트하는 단일 메소드
   void updateItemPosition(int index, Offset newPosition) {
     if (index < 0 || index >= _overviewItems.length) return;
     _overviewItems[index].position = newPosition;
     notifyListeners();
   }
 
-  /// 화면의 절대 좌표를 아트보드의 상대 좌표로 변환하여 업데이트
+  /// [핵심] 화면의 절대 좌표를 아트보드 좌표로 변환하여 업데이트
   void updateItemPositionFromGlobal(int index, Offset globalPosition) {
     if (transformationController == null) return;
 
     final Matrix4 inverseMatrix = Matrix4.inverted(
       transformationController!.value,
     );
-
-    // 이 부분을 수정했습니다.
     final Offset localPosition = MatrixUtils.transformPoint(
       inverseMatrix,
       globalPosition,
