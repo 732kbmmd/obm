@@ -1,4 +1,4 @@
-// lib/viewmodels/app_viewmodel.dart (되돌아간 버전)
+// lib/viewmodels/app_viewmodel.dart (수정 완료)
 
 import 'package:flutter/material.dart';
 import 'package:obm/data/models/assembly_item.dart';
@@ -9,6 +9,12 @@ enum EditingTarget { none, body, title }
 enum TemplateType { vertical, horizontal }
 
 class AppViewModel with ChangeNotifier {
+  TransformationController? transformationController;
+
+  void setTransformationController(TransformationController controller) {
+    transformationController = controller;
+  }
+
   bool _isEditing = false;
   bool get isEditing => _isEditing;
 
@@ -24,7 +30,6 @@ class AppViewModel with ChangeNotifier {
   int? _selectedItemIndex;
   int? get selectedItemIndex => _selectedItemIndex;
 
-  /// 아이템을 선택하는 메소드
   void selectItem(int? index) {
     if (_selectedItemIndex == index) {
       _selectedItemIndex = null;
@@ -89,5 +94,29 @@ class AppViewModel with ChangeNotifier {
     _isEditing = false;
     _editingTarget = EditingTarget.none;
     notifyListeners();
+  }
+
+  /// 아이템의 위치를 업데이트하는 메소드
+  void updateItemPosition(int index, Offset newPosition) {
+    if (index < 0 || index >= _overviewItems.length) return;
+    _overviewItems[index].position = newPosition;
+    notifyListeners();
+  }
+
+  /// 화면의 절대 좌표를 아트보드의 상대 좌표로 변환하여 업데이트
+  void updateItemPositionFromGlobal(int index, Offset globalPosition) {
+    if (transformationController == null) return;
+
+    final Matrix4 inverseMatrix = Matrix4.inverted(
+      transformationController!.value,
+    );
+
+    // 이 부분을 수정했습니다.
+    final Offset localPosition = MatrixUtils.transformPoint(
+      inverseMatrix,
+      globalPosition,
+    );
+
+    updateItemPosition(index, localPosition);
   }
 }

@@ -1,13 +1,42 @@
-// lib/views/screens/main_screen.dart (되돌아간 버전)
+// lib/views/screens/main_screen.dart (StatefulWidget으로 변경 및 컨트롤러 추가)
 
 import 'package:flutter/material.dart';
 import 'package:obm/data/models/assembly_item.dart';
 import 'package:obm/viewmodels/app_viewmodel.dart';
 import 'package:provider/provider.dart';
 
-class MainScreen extends StatelessWidget {
+// 1. StatelessWidget을 StatefulWidget으로 변경
+class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
+  @override
+  State<MainScreen> createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> {
+  // 2. TransformationController를 선언
+  late final TransformationController _transformationController;
+
+  @override
+  void initState() {
+    super.initState();
+    // 3. 컨트롤러를 초기화하고 ViewModel에 등록
+    _transformationController = TransformationController();
+    // listen: false를 사용하여 initState에서 안전하게 ViewModel에 접근
+    Provider.of<AppViewModel>(
+      context,
+      listen: false,
+    ).setTransformationController(_transformationController);
+  }
+
+  @override
+  void dispose() {
+    // 4. 위젯이 사라질 때 컨트롤러의 리소스를 해제하여 메모리 누수 방지
+    _transformationController.dispose();
+    super.dispose();
+  }
+
+  // 기존 build 메소드의 내용은 대부분 그대로 State 클래스 안으로 이동
   @override
   Widget build(BuildContext context) {
     return Consumer<AppViewModel>(
@@ -36,13 +65,13 @@ class MainScreen extends StatelessWidget {
   }
 
   Widget _buildRightPanel(AppViewModel viewModel) {
-    // --- 오버뷰 캔버스 ---
     if (!viewModel.isEditing) {
       return Container(
         color: Colors.black,
         width: double.infinity,
         height: double.infinity,
         child: InteractiveViewer(
+          transformationController: _transformationController,
           boundaryMargin: const EdgeInsets.all(20.0),
           minScale: 0.1,
           maxScale: 4.0,
@@ -60,21 +89,41 @@ class MainScreen extends StatelessWidget {
                   ) {
                     int index = entry.key;
                     AssemblyItem item = entry.value;
-
                     if (item.type == AssemblyItemType.background) {
                       return const SizedBox.shrink();
                     }
+
+                    // --- 이 부분이 핵심 변경 사항입니다 ---
                     return Positioned(
                       left: item.position.dx,
                       top: item.position.dy,
-                      child: GestureDetector(
-                        onTap: () => viewModel.selectItem(index),
-                        child: _buildAssemblyItem(
-                          item,
-                          viewModel.selectedItemIndex == index,
+                      child: Draggable<int>(
+                        // 드래그 데이터를 아이템의 인덱스로 설정
+                        data: index,
+                        // 드래그 시 보여질 위젯 (반투명 효과)
+                        feedback: Opacity(
+                          opacity: 0.7,
+                          child: _buildAssemblyItem(item, false),
+                        ),
+                        // 드래그가 끝났을 때 호출되는 콜백
+                        onDragEnd: (details) {
+                          // 화면의 절대 좌표를 ViewModel으로 전달하여 위치 업데이트 요청
+                          viewModel.updateItemPositionFromGlobal(
+                            index,
+                            details.offset,
+                          );
+                        },
+                        // 원래 위치에 보여지는 위젯
+                        child: GestureDetector(
+                          onTap: () => viewModel.selectItem(index),
+                          child: _buildAssemblyItem(
+                            item,
+                            viewModel.selectedItemIndex == index,
+                          ),
                         ),
                       ),
                     );
+                    // ------------------------------------
                   }).toList(),
                 ),
               ),
@@ -83,8 +132,7 @@ class MainScreen extends StatelessWidget {
         ),
       );
     }
-
-    // --- 세부 편집 캔버스 ---
+    // ... (이후 코드는 이전과 동일)
     return Container(
       color: Colors.black87,
       child: InteractiveViewer(
@@ -96,6 +144,7 @@ class MainScreen extends StatelessWidget {
     );
   }
 
+  // --- 나머지 헬퍼 메소드들은 변경 사항 없음 ---
   Widget _buildDetailEditor(AppViewModel viewModel) {
     switch (viewModel.editingTarget) {
       case EditingTarget.body:
@@ -135,10 +184,10 @@ class MainScreen extends StatelessWidget {
                   const SizedBox(height: 20),
                   ElevatedButton(
                     onPressed: () => viewModel.stopEditing(),
-                    child: const Text('편집 완료'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                     ),
+                    child: const Text('편집 완료'),
                   ),
                 ],
               )
