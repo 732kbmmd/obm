@@ -1,7 +1,6 @@
-// lib/views/screens/main_screen.dart (전체 코드 교체)
+// lib/views/screens/main_screen.dart (되돌아간 버전)
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // 키보드 입력을 위해 추가
 import 'package:obm/data/models/assembly_item.dart';
 import 'package:obm/viewmodels/app_viewmodel.dart';
 import 'package:provider/provider.dart';
@@ -11,67 +10,33 @@ class MainScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 키보드 입력을 받기 위해 Focus 위젯으로 감쌉니다.
-    return Focus(
-      autofocus: true,
-      onKeyEvent: (node, event) {
-        if (event is! KeyDownEvent) return KeyEventResult.ignored;
-
-        final viewModel = Provider.of<AppViewModel>(context, listen: false);
-        if (viewModel.selectedItemIndex == null || viewModel.isEditing) {
-          return KeyEventResult.ignored;
-        }
-
-        final currentPosition =
-            viewModel.overviewItems[viewModel.selectedItemIndex!].position;
-        Offset newPosition;
-
-        switch (event.logicalKey) {
-          case LogicalKeyboardKey.arrowUp:
-            newPosition = currentPosition.translate(0, -1);
-            break;
-          case LogicalKeyboardKey.arrowDown:
-            newPosition = currentPosition.translate(0, 1);
-            break;
-          case LogicalKeyboardKey.arrowLeft:
-            newPosition = currentPosition.translate(-1, 0);
-            break;
-          case LogicalKeyboardKey.arrowRight:
-            newPosition = currentPosition.translate(1, 0);
-            break;
-          default:
-            return KeyEventResult.ignored;
-        }
-        viewModel.updateSelectedItemPosition(newPosition);
-        return KeyEventResult.handled;
-      },
-      child: Consumer<AppViewModel>(
-        builder: (context, viewModel, child) {
-          return Scaffold(
-            appBar: AppBar(
-              title: Text(viewModel.isEditing ? '세부 편집 모드' : '오버뷰 모드'),
-              centerTitle: true,
-            ),
-            body: Row(
-              children: [
-                if (viewModel.isEditing)
-                  Expanded(
-                    child: Container(
-                      color: Colors.indigo.shade900,
-                      child: const Center(child: Text('축소된 오버뷰 캔버스')),
-                    ),
+    return Consumer<AppViewModel>(
+      builder: (context, viewModel, child) {
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(viewModel.isEditing ? '세부 편집 모드' : '오버뷰 모드'),
+            centerTitle: true,
+          ),
+          body: Row(
+            children: [
+              if (viewModel.isEditing)
+                Expanded(
+                  child: Container(
+                    color: Colors.indigo.shade900,
+                    child: const Center(child: Text('축소된 오버뷰 캔버스')),
                   ),
-                Expanded(child: _buildRightPanel(context, viewModel)),
-                _buildInspector(context, viewModel),
-              ],
-            ),
-          );
-        },
-      ),
+                ),
+              Expanded(child: _buildRightPanel(viewModel)),
+              _buildInspector(viewModel),
+            ],
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildRightPanel(BuildContext context, AppViewModel viewModel) {
+  Widget _buildRightPanel(AppViewModel viewModel) {
+    // --- 오버뷰 캔버스 ---
     if (!viewModel.isEditing) {
       return Container(
         color: Colors.black,
@@ -95,11 +60,11 @@ class MainScreen extends StatelessWidget {
                   ) {
                     int index = entry.key;
                     AssemblyItem item = entry.value;
+
                     if (item.type == AssemblyItemType.background) {
                       return const SizedBox.shrink();
                     }
-
-                    final positionedItem = Positioned(
+                    return Positioned(
                       left: item.position.dx,
                       top: item.position.dy,
                       child: GestureDetector(
@@ -110,34 +75,6 @@ class MainScreen extends StatelessWidget {
                         ),
                       ),
                     );
-
-                    return Draggable<int>(
-                      data: index,
-                      feedback: Opacity(
-                        opacity: 0.7,
-                        child: _buildAssemblyItem(item, false),
-                      ),
-                      onDragUpdate: (details) {
-                        // 드래그 중 실시간 위치 업데이트 (선택사항)
-                        // final RenderBox viewerBox = context.findRenderObject() as RenderBox;
-                        // final Offset localOffset = viewerBox.globalToLocal(details.globalPosition);
-                        // viewModel.updateSelectedItemPosition(localOffset);
-                      },
-                      onDragEnd: (details) {
-                        final RenderBox viewerBox =
-                            context.findRenderObject() as RenderBox;
-                        // InteractiveViewer 내부의 좌표계가 아닌, 전체 화면 기준의 좌표로 변환해야 함
-                        // 이 부분은 더 복잡한 계산이 필요하므로, 여기서는 우선 간단한 오프셋만 사용
-                        // 정확한 구현을 위해서는 TransformationController를 사용해야 합니다.
-                        // 지금은 드래그 시작점 대비 변화량으로 위치를 계산합니다.
-                        final currentPos =
-                            viewModel.overviewItems[index].position;
-                        viewModel.updateSelectedItemPosition(
-                          currentPos + details.offset,
-                        );
-                      },
-                      child: positionedItem,
-                    );
                   }).toList(),
                 ),
               ),
@@ -147,6 +84,7 @@ class MainScreen extends StatelessWidget {
       );
     }
 
+    // --- 세부 편집 캔버스 ---
     return Container(
       color: Colors.black87,
       child: InteractiveViewer(
@@ -174,13 +112,12 @@ class MainScreen extends StatelessWidget {
           color: Colors.red.shade900,
           child: const Center(child: Text('타이틀 편집 캔버스')),
         );
-      case EditingTarget.none:
       default:
         return Container(color: Colors.grey, child: const Text('오류'));
     }
   }
 
-  Widget _buildInspector(BuildContext context, AppViewModel viewModel) {
+  Widget _buildInspector(AppViewModel viewModel) {
     final selectedItem = viewModel.selectedItemIndex != null
         ? viewModel.overviewItems[viewModel.selectedItemIndex!]
         : null;
@@ -189,122 +126,44 @@ class MainScreen extends StatelessWidget {
       width: 280,
       color: const Color(0xFF2a2a2a),
       padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (viewModel.isEditing) ...[
-            const Text(
-              '세부 편집 중',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const Divider(height: 20),
-            ElevatedButton(
-              onPressed: () => viewModel.stopEditing(),
-              child: const Text('편집 완료'),
-            ),
-          ] else if (selectedItem != null) ...[
-            Text(
-              '선택됨: ${selectedItem.type.name}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const Divider(height: 20),
-            if (selectedItem.type == AssemblyItemType.body ||
-                selectedItem.type == AssemblyItemType.title)
-              ElevatedButton.icon(
-                icon: const Icon(Icons.edit),
-                label: const Text('세부 편집'),
-                onPressed: () {
-                  final target = selectedItem.type == AssemblyItemType.body
-                      ? EditingTarget.body
-                      : EditingTarget.title;
-                  viewModel.startEditing(target, selectedItem);
-                },
-              ),
-            const Divider(height: 20),
-            _buildCoordinateController(
-              label: 'X 좌표',
-              value: selectedItem.position.dx,
-              onUpdate: (newValue) {
-                viewModel.updateSelectedItemPosition(
-                  Offset(newValue, selectedItem.position.dy),
-                );
-              },
-            ),
-            const SizedBox(height: 10),
-            _buildCoordinateController(
-              label: 'Y 좌표',
-              value: selectedItem.position.dy,
-              onUpdate: (newValue) {
-                viewModel.updateSelectedItemPosition(
-                  Offset(selectedItem.position.dx, newValue),
-                );
-              },
-            ),
-          ] else
-            const Center(child: Text('전체 속성 패널')),
-        ],
+      child: Center(
+        child: viewModel.isEditing
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('세부 속성 패널'),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: () => viewModel.stopEditing(),
+                    child: const Text('편집 완료'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                    ),
+                  ),
+                ],
+              )
+            : selectedItem != null &&
+                  (selectedItem.type == AssemblyItemType.body ||
+                      selectedItem.type == AssemblyItemType.title)
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('선택됨: ${selectedItem.type.name}'),
+                  const SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.edit),
+                    label: const Text('세부 편집'),
+                    onPressed: () {
+                      final target = selectedItem.type == AssemblyItemType.body
+                          ? EditingTarget.body
+                          : EditingTarget.title;
+                      viewModel.startEditing(target, selectedItem);
+                    },
+                  ),
+                ],
+              )
+            : const Text('전체 속성 패널'),
       ),
-    );
-  }
-
-  Widget _buildCoordinateController({
-    required String label,
-    required double value,
-    required Function(double) onUpdate,
-  }) {
-    final controller = TextEditingController(text: value.toStringAsFixed(1));
-    controller.selection = TextSelection.fromPosition(
-      TextPosition(offset: controller.text.length),
-    );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            IconButton(
-              onPressed: () => onUpdate(value - 5),
-              icon: const Icon(Icons.keyboard_double_arrow_left),
-              iconSize: 18,
-            ),
-            IconButton(
-              onPressed: () => onUpdate(value - 1),
-              icon: const Icon(Icons.keyboard_arrow_left),
-              iconSize: 18,
-            ),
-            Expanded(
-              child: SizedBox(
-                height: 40,
-                child: TextFormField(
-                  controller: controller,
-                  textAlign: TextAlign.center,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  onFieldSubmitted: (textValue) =>
-                      onUpdate(double.tryParse(textValue) ?? value),
-                  decoration: const InputDecoration(
-                    contentPadding: EdgeInsets.zero,
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ),
-            ),
-            IconButton(
-              onPressed: () => onUpdate(value + 1),
-              icon: const Icon(Icons.keyboard_arrow_right),
-              iconSize: 18,
-            ),
-            IconButton(
-              onPressed: () => onUpdate(value + 5),
-              icon: const Icon(Icons.keyboard_double_arrow_right),
-              iconSize: 18,
-            ),
-          ],
-        ),
-      ],
     );
   }
 
